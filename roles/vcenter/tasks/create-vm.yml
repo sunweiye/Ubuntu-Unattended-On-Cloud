@@ -1,0 +1,52 @@
+---
+#- name: Install
+#  easy_install:
+#    name: pysphere
+#    state: latest
+#  become: true
+
+- name: upload ISO
+  vsphere_copy :
+    host: "{{vcenter.host}}"
+    login: "{{vcenter.username}}"
+    password: "{{vcenter.passwd}}"
+    datacenter: "{{vcenter.datacenter}}"
+    datastore: "{{vcenter.datastore}}"
+    src: ./ubuntu.iso
+    path: Files/ubuntu.iso
+    validate_certs: no
+
+- name: create vm
+  vsphere_guest:
+    vcenter_hostname: "{{vcenter.host}}"
+    username: "{{vcenter.username}}"
+    password: "{{vcenter.passwd}}"
+    guest: "{{vm_config.name}}"
+    validate_certs: no
+    state: powered_on
+    vm_hw_version: vmx-09
+    vm_extra_config:
+      vcpu.hotadd: yes
+      mem.hotadd:  yes
+      notes: This is a test VM
+    vm_disk:
+      disk1:
+        size_gb: 20
+        type: thin
+        datastore: "{{vcenter.datastore}}"
+    vm_nic:
+      nic1:
+        network: VM Network
+        type: vmxnet3
+        network_type: standard
+    vm_hardware:
+      memory_mb: 2048
+      num_cpus: 2
+      osid: ubuntu64Guest
+      scsi: paravirtual
+      vm_cdrom:
+        type: "iso"
+        iso_path: "{{vcenter.datastore}}/Files/ubuntu.iso"
+    esxi:
+      datacenter: "{{vcenter.datacenter}}"
+      hostname: "{{vcenter.esxi}}"

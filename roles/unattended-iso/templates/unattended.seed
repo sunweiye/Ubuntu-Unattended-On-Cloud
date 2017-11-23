@@ -1,0 +1,108 @@
+# 1. Language, country and locale settings
+d-i debian-installer/language                               string      en
+d-i debian-installer/country                                string      US
+d-i debian-installer/locale                                 string      {{preseed_configs.locale}}
+d-i localechooser/supported-locales                         multiselect en_US.UTF-8
+
+# 2. Keyboard settings
+# Disable automatic (interactive) keymap detection.
+d-i console-setup/ask_detect                                boolean     false
+d-i keyboard-configuration/layoutcode                       string      us
+d-i keyboard-configuration/variantcode                      string      intl
+d-i keyboard-configuration/xkb-keymap                       select      us(intl)
+
+# 3. Network configuration
+d-i netcfg/choose_interface                                 select      auto
+d-i netcfg/dhcp_timeout                                     string      10
+d-i netcfg/dhcpv6_timeout                                   string      10
+d-i netcfg/get_hostname                                     string      {{preseed_configs.hostname}}
+d-i netcfg/get_domain                                       string      {{preseed_configs.hostname}}
+
+# 4. Mirror settings: Use default settings: the installer uses CC.archive.ubuntu.com where
+# CC is the ISO-3166-2 code for the selected country. You can preseed this
+# so that it does so without asking.
+d-i mirror/http/proxy                                       string
+d-i mirror/http/mirror                                      select      {{preseed_configs.country}}.archive.ubuntu.com
+
+# 5. User account setup
+d-i passwd/root-login                                       boolean     true
+d-i passwd/make-user                                        boolean     false
+d-i passwd/root-password-crypted                            password    {{ preseed_configs.root_passwd | password_hash('sha512') }}
+
+# 6. Clock and timezone settings
+d-i clock-setup/utc                                         boolean     false
+d-i time/zone                                               string      {{preseed_configs.timezone}}
+d-i clock-setup/ntp                                         boolean     true
+d-i clock-setup/ntp-server                                  string      ntp.ubuntu.com
+
+# 7. Disk partitioning with regular method
+# 7.1 Force to use the first hard disk device
+d-i partman-auto/disk                                       string      /dev/sda
+d-i partman-auto/method                                     string      regular
+
+# 7.2 If one of the disks that are going to be automatically partitioned
+# contains an old LVM configuration, the user will normally receive a
+# warning. Preseed this away
+d-i partman-lvm/device_remove_lvm                           boolean     true
+d-i partman-md/device_remove_md                             boolean     true
+
+# 7.3 And the same goes for the confirmation to write the lvm partitions.
+d-i partman-lvm/confirm                                     boolean     true
+d-i partman-lvm/confirm_nooverwrite                         boolean     true
+
+# 7.4 Use multi partitioning recipes
+d-i partman-auto/choose_recipe                              select      multi
+d-i partman-auto/expert_recipe                              string      \
+      boot-root ::                                            \
+              256 512 1024 ext4                               \
+                      $primary{ } $bootable{ }                \
+                      method{ format } format{ }              \
+                      use_filesystem{ } filesystem{ ext4 }    \
+                      mountpoint{ /boot }                     \
+              .                                               \
+              1024 2048 200% linux-swap                       \
+                      $lvmok{ }                               \
+                      lv_name{ swap }                         \
+                      method{ swap } format{ }                \
+              .                                               \
+              8192 12048 15360 etx4                           \
+                      $lvmok{ }                               \
+                      lv_name{ root }                         \
+                      method{ format } format{ }              \
+                      use_filesystem{ } filesystem{ ext4 }    \
+                      mountpoint{ / }                         \
+              .                                               \
+              4096 6144 8192 ext4                             \
+                      $lvmok{ }                               \
+                      lv_name{ home }                         \
+                      method{ format } format{ }              \
+                      use_filesystem{ } filesystem{ ext4 }    \
+                      mountpoint{ /home }                     \
+              .
+d-i partman/default_filesystem                              string      ext4
+
+# 7.4 Confirm the partition
+d-i partman-partitioning/confirm_write_new_label            boolean     true
+d-i partman/choose_partition                                select      finish
+d-i partman/confirm                                         boolean     true
+d-i partman/confirm_nooverwrite                             boolean     true
+
+# 8 Apt installation
+tasksel tasksel/first                                       multiselect standard, openssh-server
+d-i pkgsel/install-language-support                         boolean     tru
+d-i pkgsel/include 					                        string      build-essential
+d-i pkgsel/upgrade                                          select      none
+d-i pkgsel/update-policy                                    select      none
+d-i pkgsel/updatedb                                         boolean     true
+
+# Bootloader configuration
+d-i grub-installer/only_debian                              boolean     true
+d-i grub-installer/with_other_os                            boolean     true
+d-i grup-installer/bootdev                                  string      /dev/sda
+
+# Finishing up the installation
+d-i finish-install/reboot_in_progress                       note
+d-i finish-install/keep-consoles                            boolean     false
+d-i cdrom-detect/eject                                      boolean     true
+d-i debian-installer/exit/halt                              boolean     false
+d-i debian-installer/exit/poweroff                          boolean     false

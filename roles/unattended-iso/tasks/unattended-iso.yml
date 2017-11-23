@@ -1,0 +1,71 @@
+---
+- name: Creates base working directories
+  file:
+    path: "./build/{{item}}"
+    recurse: true
+    state: directory
+  with_items:
+    - source
+    - target
+
+- name: Download the Ubuntu ISO file
+  get_url:
+    url: http://releases.ubuntu.com/16.04.3/ubuntu-16.04.3-server-amd64.iso
+    dest: ./build/ubuntu-server.iso
+
+- name: Create the unattended installation ISO
+  block:
+    - name: Extract ubuntu installation files to target directory
+      command: "{{item}}"
+      with_items:
+        - mount -o loop ./build/ubuntu-server.iso ./build/source
+        - cp -rT ./build/source ./build/target
+        - chmod -R 777 ./build/target
+      become: true
+      warn: no
+
+    - name: Create unattended preseed file wiht template
+      template:
+        src: unattended.seed
+        dest: build/target/preseed/unattended.seed
+        force: true
+      tags:
+        - iso
+
+    - name: Set the language for the installation menu
+      shell: echo en >build/target/isolinux/lang
+
+    - name: Set the timeout for language selection
+      lineinfile:
+        path: build/target/isolinux/isolinux.cfg
+        regexp: '^timeout 0'
+        line: 'timeout 1'
+
+    - name: Config the txt.cfg file
+      blockinfile:
+        path: build/target/isolinux/txt.cfg
+        insertafter: "default install"
+        content: |
+          label autoinstall
+            menu label ^Unattended Ubuntu Server Install
+            kernel /install/vmlinuz
+            append file=/cdrom/preseed/ubuntu-server.seed initrd=/install/initrd.gz auto=true priority=high preseed/file=/cdrom/preseed/unattended.seed ---
+
+    - name: Create the unattended Ubuntu installation ISO
+      command: mkisofs -D -r -V "ATTENDLESS_UBUNTU" -cache-inodes -J -l -b isolinux/isolinux.bin -c isolinux/boot.cat -no-emul-boot -boot-load-size 4 -boot-info-table -o build/ubuntu.iso build/target
+  rescue:
+    - debug: msg='Error occours during creation of the unattended installation ISO. No rescue method will be executed.'
+    - command: /bin/false
+  always:
+    - name: Clean up the creation
+      command: umount ./build/source
+      become: true
+
+- name: Delete the downloaded Ubuntu installation ISO file and the temporary directories
+  file:
+    path: "./build/{{item}}"
+    state: absent
+  with_items:
+    - ubuntu-server.iso
+    - source
+    - target

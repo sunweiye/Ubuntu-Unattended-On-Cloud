@@ -1,0 +1,34 @@
+---
+- name: Install ubuntu with iso on vpshere
+  hosts: all
+  connection: local
+  become: no
+  pre_tasks:
+    - name: Determine if the custom variables path exists
+      local_action: stat path=vars
+      register: include_vars_path
+      tags:
+        - pre-tasks
+
+    - name: Import the custom variables that are defined in .json, .jsn, .yaml, .yml
+      include_vars:
+        dir: 'vars'
+        depth: 2
+        extensions:
+          - yaml
+          - yml
+          - json
+          - jsn
+      when: include_vars_path.stat.isdir is defined and include_vars_path.stat.isdir
+      tags:
+        - pre-tasks
+
+    - name: Set the base working directory path
+      set_fact:
+        base_working_dir: "{{ playbook_dir }}/build"
+      when: base_working_dir is not defined
+      tags:
+        - pre-tasks
+  roles:
+    - unattended-iso
+    - vcenter
